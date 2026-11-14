@@ -24,12 +24,45 @@ local function tween(inst, goal, t)
     TweenService:Create(inst, TweenInfo.new(t or 0.15), goal):Play()
 end
 
--- Retorna o level atual do personagem via leaderstats
+-- Retorna o level atual — varre todos os folders do player procurando IntValue/NumberValue com nome de level
 local function getLevel()
+    local NAMES = {"Level","level","Lv","lv","LV","Nivel","nivel","Rank","rank","lvl","Lvl"}
+    -- tenta leaderstats primeiro
     local stats = lp:FindFirstChild("leaderstats")
-    if not stats then return 0 end
-    local lv = stats:FindFirstChild("Level") or stats:FindFirstChild("Lv") or stats:FindFirstChild("level")
-    return lv and lv.Value or 0
+    if stats then
+        for _, n in pairs(NAMES) do
+            local v = stats:FindFirstChild(n)
+            if v and (v:IsA("IntValue") or v:IsA("NumberValue")) and v.Value > 0 then
+                return math.floor(v.Value)
+            end
+        end
+        -- qualquer IntValue/NumberValue com valor razoavel
+        for _, v in pairs(stats:GetChildren()) do
+            if (v:IsA("IntValue") or v:IsA("NumberValue")) and v.Value > 0 and v.Value < 100000 then
+                return math.floor(v.Value)
+            end
+        end
+    end
+    -- varre todos os filhos diretos do player
+    for _, folder in pairs(lp:GetChildren()) do
+        if folder:IsA("Folder") or folder:IsA("Configuration") or folder.Name:lower():find("stat") then
+            for _, n in pairs(NAMES) do
+                local v = folder:FindFirstChild(n)
+                if v and (v:IsA("IntValue") or v:IsA("NumberValue")) and v.Value > 0 then
+                    return math.floor(v.Value)
+                end
+            end
+        end
+        -- IntValue direto no player
+        if (folder:IsA("IntValue") or folder:IsA("NumberValue")) then
+            for _, n in pairs(NAMES) do
+                if folder.Name == n and folder.Value > 0 then
+                    return math.floor(folder.Value)
+                end
+            end
+        end
+    end
+    return 0
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -224,24 +257,35 @@ local function isMobOfZone(model, zone)
     return false
 end
 
--- Busca um mob vivo da zona dentro de um raio a partir da posição
+-- Busca um mob vivo da zona dentro de um raio
+-- Se nenhum mob bater pelo nome da zona, retorna o nearest vivo no raio (fallback)
 local function getMobInZone(zone, fromPos, radius)
-    radius = radius or 200
+    radius = radius or 300
     local best, bestDist = nil, math.huge
+    local fallback, fallbackDist = nil, math.huge
     for _, obj in pairs(Workspace:GetDescendants()) do
         if obj:IsA("Model") and not Players:GetPlayerFromCharacter(obj) then
             local hum  = obj:FindFirstChildOfClass("Humanoid")
             local root = obj:FindFirstChild("HumanoidRootPart")
-            if hum and hum.Health > 0 and root and isMobOfZone(obj, zone) then
+            if hum and hum.Health > 0 and root then
                 local d = (fromPos - root.Position).Magnitude
-                if d < radius and d < bestDist then
-                    bestDist = d
-                    best = obj
+                if d < radius then
+                    -- fallback: qualquer mob vivo no raio
+                    if d < fallbackDist then
+                        fallbackDist = d
+                        fallback = obj
+                    end
+                    -- preferencial: mob da zona pelo nome
+                    if isMobOfZone(obj, zone) and d < bestDist then
+                        bestDist = d
+                        best = obj
+                    end
                 end
             end
         end
     end
-    return best
+    -- retorna o mob da zona se encontrado, senão qualquer mob vivo próximo
+    return best or fallback
 end
 
 -- Loop principal do farm — task loop, não Heartbeat
@@ -759,7 +803,7 @@ task.spawn(function()
         task.wait(1)
         local lv   = getLevel()
         local zone = getZoneForLevel(lv)
-        zoneLvLabel.Text  = "Level: " .. lv
+        zoneLvLabel.Text  = lv > 0 and ("Level: " .. lv) or "Level: (lendo...)"
         zoneNameLabel.Text = "Zona: " .. zone.name
         local seaColor = zone.sea == "1st" and C.sea1 or zone.sea == "2nd" and C.sea2 or C.sea3
         zoneSeaLabel.Text      = zone.sea .. " Sea"
