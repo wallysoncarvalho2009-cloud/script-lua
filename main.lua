@@ -1039,6 +1039,143 @@ simpleBtn(msPage, "COPIAR POSICAO", function()
     if root then setclipboard(tostring(root.Position)) end
 end, 9)
 
+-- ─────────────────────────────────────────────────────────────
+-- SECAO WEBHOOK — envia join link para Discord
+-- ─────────────────────────────────────────────────────────────
+sectionTitle(msPage, "WEBHOOK DISCORD", nil, 10)
+
+-- campo URL do webhook
+local whFrame = Instance.new("Frame", msPage)
+whFrame.Size = UDim2.new(1, -12, 0, 54)
+whFrame.BackgroundColor3 = C.panel
+whFrame.BorderSizePixel = 0
+whFrame.LayoutOrder = 11
+corner(whFrame, 6)
+
+local whLbl = label(whFrame, "URL do Webhook", 11, C.textDim)
+whLbl.Size = UDim2.new(1, -10, 0, 16)
+whLbl.Position = UDim2.new(0, 10, 0, 4)
+
+local whBox = Instance.new("TextBox", whFrame)
+whBox.Size = UDim2.new(1, -20, 0, 24)
+whBox.Position = UDim2.new(0, 10, 0, 24)
+whBox.BackgroundColor3 = C.dark
+whBox.TextColor3 = C.text
+whBox.PlaceholderText = "https://discord.com/api/webhooks/..."
+whBox.Text = ""
+whBox.Font = Enum.Font.Code
+whBox.TextSize = 10
+whBox.BorderSizePixel = 0
+whBox.ClearTextOnFocus = false
+corner(whBox, 4)
+
+-- campo mensagem customizada (opcional)
+local whMsgFrame = Instance.new("Frame", msPage)
+whMsgFrame.Size = UDim2.new(1, -12, 0, 54)
+whMsgFrame.BackgroundColor3 = C.panel
+whMsgFrame.BorderSizePixel = 0
+whMsgFrame.LayoutOrder = 12
+corner(whMsgFrame, 6)
+
+local whMsgLbl = label(whMsgFrame, "Mensagem (opcional)", 11, C.textDim)
+whMsgLbl.Size = UDim2.new(1, -10, 0, 16)
+whMsgLbl.Position = UDim2.new(0, 10, 0, 4)
+
+local whMsgBox = Instance.new("TextBox", whMsgFrame)
+whMsgBox.Size = UDim2.new(1, -20, 0, 24)
+whMsgBox.Position = UDim2.new(0, 10, 0, 24)
+whMsgBox.BackgroundColor3 = C.dark
+whMsgBox.TextColor3 = C.text
+whMsgBox.PlaceholderText = "ex: Depth King - 11/12"
+whMsgBox.Text = ""
+whMsgBox.Font = Enum.Font.Code
+whMsgBox.TextSize = 10
+whMsgBox.BorderSizePixel = 0
+whMsgBox.ClearTextOnFocus = false
+corner(whMsgBox, 4)
+
+-- botao enviar
+local whBtn = Instance.new("TextButton", msPage)
+whBtn.Size = UDim2.new(1, -12, 0, 30)
+whBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242) -- Discord azul
+whBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+whBtn.Font = Enum.Font.GothamBold
+whBtn.TextSize = 12
+whBtn.Text = "ENVIAR JOIN LINK"
+whBtn.BorderSizePixel = 0
+whBtn.LayoutOrder = 13
+corner(whBtn, 6)
+
+-- gera link de join do servidor atual
+local function getJoinLink()
+    local placeId  = game.PlaceId
+    local jobId    = game.JobId
+    -- link direto para este servidor via roblox://
+    return string.format("roblox://experiences/start?placeId=%s&gameInstanceId=%s", placeId, jobId)
+end
+
+-- envia via request HTTP (syn/http_request dependendo do executor)
+local function sendWebhook(url, msg)
+    if url == "" or not url:find("discord.com/api/webhooks") then
+        notify("URL invalida!", Color3.fromRGB(220,60,60))
+        return
+    end
+    local lv       = getLevel()
+    local joinLink = getJoinLink()
+    local username = lp.Name
+    local content  = string.format(
+        "**%s** | Level **%d**\n%s\n> Join: %s",
+        username, lv,
+        msg ~= "" and ("```" .. msg .. "```") or "",
+        joinLink
+    )
+    local body = game:GetService("HttpService"):JSONEncode({
+        username   = "NTT HUB",
+        avatar_url = "https://i.imgur.com/4M34hi2.png",
+        embeds = {{
+            title       = "King Legacy — Join Link",
+            description = content,
+            color       = 0xE84393,
+            footer      = { text = "NTT HUB • " .. os.date("%H:%M:%S") }
+        }}
+    })
+    local ok, err = pcall(function()
+        local req = (syn and syn.request) or (http and http.request) or request
+        req({
+            Url     = url,
+            Method  = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body    = body
+        })
+    end)
+    if ok then
+        notify("Webhook enviado!", Color3.fromRGB(50,200,100))
+    else
+        notify("Erro: " .. tostring(err):sub(1,40), Color3.fromRGB(220,60,60))
+    end
+end
+
+whBtn.MouseButton1Click:Connect(function()
+    sendWebhook(whBox.Text, whMsgBox.Text)
+end)
+
+-- auto-send toggle (envia a cada X minutos)
+local whAutoRunning = false
+local whTask = nil
+toggleRow(msPage, "Auto Webhook", "Envia join link automaticamente (5 min)", function(v)
+    whAutoRunning = v
+    if v then
+        whTask = task.spawn(function()
+            while whAutoRunning do
+                sendWebhook(whBox.Text, whMsgBox.Text)
+                task.wait(300) -- 5 minutos
+            end
+        end)
+    else
+        whAutoRunning = false
+    end
+end, 14)
+
 -- ── Tabs sidebar ──────────────────────────────────────────────────────────────
 local tabY = 10
 for _, name in pairs(tabNames) do
