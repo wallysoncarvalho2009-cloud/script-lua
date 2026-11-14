@@ -1,0 +1,34 @@
+# NTT HUB — King Legacy Script
+
+Script Roblox para King Legacy com painel GUI completo, sistema de key e múltiplas funções.
+
+## Como usar
+
+1. Cole o `loader.lua` no seu executor
+2. Execute
+3. Insira sua key quando o painel de autenticação aparecer
+4. Use as abas do painel para ativar as funções
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/SEU_USUARIO/SEU_REPO/main/loader.lua"))()
+```
+
+## Funções
+
+| Aba | Funções |
+|---|---|
+| AUTO FARM | Auto Farm, Auto Skill, Auto Collect Fruit, Auto Quest, Auto Sea Beast, Auto Raid |
+| ESP | Fruit ESP, Player ESP, Boss ESP, NPC ESP |
+| TELEPORT | 12 ilhas + coordenadas manuais |
+| STATS | Auto Stats (Combat / Defense / Sword / Fruit) |
+| MISC | Fly, Speed Hack, Anti AFK, No Cooldown, Rejoin, Copy Position |
+
+## Sistema de Key
+
+- Adicione keys válidas em `keys.txt` (uma por linha)
+- Para revogar, remova a linha
+- Não há expiração automática — você controla manualmente
+
+## Suporte
+
+Testado em: Synapse X · KRNL · Delta · Fluxus · Hydrogen
