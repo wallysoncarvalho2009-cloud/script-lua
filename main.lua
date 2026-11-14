@@ -2,14 +2,14 @@
 -- github.com/wallysoncarvalho2009-cloud/script-lua
 -- Sem key — execucao direta
 
-local Players        = game:GetService("Players")
-local RunService     = game:GetService("RunService")
-local TweenService   = game:GetService("TweenService")
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local TweenService     = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local Workspace      = game:GetService("Workspace")
-local lp             = Players.LocalPlayer
-local lc             = lp.Character or lp.CharacterAdded:Wait()
-local cam            = Workspace.CurrentCamera
+local Workspace        = game:GetService("Workspace")
+local lp               = Players.LocalPlayer
+local lc               = lp.Character or lp.CharacterAdded:Wait()
+local cam              = Workspace.CurrentCamera
 
 local function getChar() return lp.Character end
 local function getRoot()
@@ -24,28 +24,77 @@ local function tween(inst, goal, t)
     TweenService:Create(inst, TweenInfo.new(t or 0.15), goal):Play()
 end
 
-local State = {
-    autoFarm        = false,
-    autoStats       = false,
-    statMode        = "Combat",
-    fruitESP        = false,
-    playerESP       = false,
-    bossESP         = false,
-    npcESP          = false,
-    fly             = false,
-    speed           = false,
-    speedValue      = 50,
-    antiAfk         = false,
-    autoSkill       = false,
-    autoCollectFruit= false,
-    noCooldown      = false,
-    autoSeaBeast    = false,
-    autoRaid        = false,
-    farmTarget      = "Nearest",
-    flySpeed        = 30,
+-- Retorna o level atual do personagem via leaderstats
+local function getLevel()
+    local stats = lp:FindFirstChild("leaderstats")
+    if not stats then return 0 end
+    local lv = stats:FindFirstChild("Level") or stats:FindFirstChild("Lv") or stats:FindFirstChild("level")
+    return lv and lv.Value or 0
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ZONAS POR LEVEL (King Legacy — coordenadas e nomes parciais dos mobs)
+-- sea: "1st" | "2nd" | "3rd"
+-- ─────────────────────────────────────────────────────────────────────────────
+local LEVEL_ZONES = {
+    -- 1st Sea ─────────────────────────────────────────────────────────────────
+    { min=0,    max=50,   sea="1st", name="Ilha Inicial",        pos=Vector3.new(0,     100,  0),    mobs={"Bandit","Pirate","Villager"} },
+    { min=50,   max=100,  sea="1st", name="Ilha Buggy",          pos=Vector3.new(1200,  100, -400),   mobs={"Buggy","Clown","Pirate"} },
+    { min=100,  max=200,  sea="1st", name="Ilha Zoro",           pos=Vector3.new(-800,  100,  600),   mobs={"Dojo","Swordsman","Trainee"} },
+    { min=200,  max=300,  sea="1st", name="Ilha Nami",           pos=Vector3.new(2000,  100,  100),   mobs={"Orange","Marine","Pirate"} },
+    { min=300,  max=500,  sea="1st", name="Marine HQ (1st)",     pos=Vector3.new(2500,  100, -1000),  mobs={"Marine","Soldier"} },
+    { min=500,  max=700,  sea="1st", name="Sky Island",          pos=Vector3.new(0,     500,  2000),  mobs={"God","Shandian","Warrior"} },
+    { min=700,  max=900,  sea="1st", name="Ilha Shanks",         pos=Vector3.new(3000,  100,  500),   mobs={"Shanks","RedHair","Crew"} },
+    { min=900,  max=1100, sea="1st", name="Ilha do Treino",      pos=Vector3.new(-2000, 100,  1500),  mobs={"Trainee","Fighter","Guard"} },
+
+    -- 2nd Sea ─────────────────────────────────────────────────────────────────
+    { min=1100, max=1400, sea="2nd", name="Alabasta",            pos=Vector3.new(5000,  100,  1000),  mobs={"Rebel","Guard","Soldier"} },
+    { min=1400, max=1700, sea="2nd", name="Thriller Bark",       pos=Vector3.new(5500,  100, -800),   mobs={"Zombie","Mast","Soldier"} },
+    { min=1700, max=2000, sea="2nd", name="Dressrosa (entrada)", pos=Vector3.new(6200,  100,  400),   mobs={"Toys","Toy","Guard"} },
+    { min=2000, max=2400, sea="2nd", name="Marineford",          pos=Vector3.new(7000,  100,  0),     mobs={"Admiral","Marine","Officer"} },
+    { min=2400, max=2800, sea="2nd", name="Punk Hazard",         pos=Vector3.new(7800,  100, -1200),  mobs={"Dragon","Smoker","Gas"} },
+
+    -- 3rd Sea ─────────────────────────────────────────────────────────────────
+    { min=2800, max=3200, sea="3rd", name="Wano",                pos=Vector3.new(9500,  100,  600),   mobs={"Samurai","Orochi","Guard"} },
+    { min=3200, max=3700, sea="3rd", name="Onigashima",          pos=Vector3.new(10200, 100,  200),   mobs={"Beast","Kaido","Pirate"} },
+    { min=3700, max=4200, sea="3rd", name="Elbaf",               pos=Vector3.new(11000, 100, -500),   mobs={"Giant","Viking","Warrior"} },
+    { min=4200, max=9999, sea="3rd", name="Ilha Final (3rd)",    pos=Vector3.new(12000, 100,  0),     mobs={"Elite","God","King"} },
 }
 
--- ── ESP ───────────────────────────────────────────────────────────────────────
+local function getZoneForLevel(lv)
+    for _, z in pairs(LEVEL_ZONES) do
+        if lv >= z.min and lv < z.max then return z end
+    end
+    return LEVEL_ZONES[#LEVEL_ZONES]
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- STATE
+-- ─────────────────────────────────────────────────────────────────────────────
+local State = {
+    autoFarm         = false,
+    autoStats        = false,
+    statMode         = "Combat",
+    fruitESP         = false,
+    playerESP        = false,
+    bossESP          = false,
+    npcESP           = false,
+    fly              = false,
+    speed            = false,
+    speedValue       = 50,
+    antiAfk          = false,
+    autoSkill        = false,
+    autoCollectFruit = false,
+    noCooldown       = false,
+    autoSeaBeast     = false,
+    autoRaid         = false,
+    flySpeed         = 30,
+    currentZone      = nil,
+}
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ESP
+-- ─────────────────────────────────────────────────────────────────────────────
 local espObjects = {}
 local function makeBox(parent, color)
     local bb = Instance.new("BillboardGui")
@@ -161,48 +210,119 @@ local function updateNpcESP()
     end
 end
 
--- ── Auto Farm ─────────────────────────────────────────────────────────────────
-local function getNearestMob()
-    local root = getRoot()
-    if not root then return nil end
-    local nearest, dist = nil, math.huge
+-- ─────────────────────────────────────────────────────────────────────────────
+-- AUTO FARM — por level
+-- Encontra mobs da zona correta para o level atual, não o nearest global
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Verifica se um modelo corresponde aos mobs da zona
+local function isMobOfZone(model, zone)
+    local name = model.Name:lower()
+    for _, keyword in pairs(zone.mobs) do
+        if name:find(keyword:lower()) then return true end
+    end
+    return false
+end
+
+-- Busca um mob vivo da zona dentro de um raio a partir da posição
+local function getMobInZone(zone, fromPos, radius)
+    radius = radius or 200
+    local best, bestDist = nil, math.huge
     for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid")
-            and not Players:GetPlayerFromCharacter(obj) then
-            local hum = obj:FindFirstChildOfClass("Humanoid")
-            local r   = obj:FindFirstChild("HumanoidRootPart")
-            if hum and hum.Health > 0 and r then
-                local d = (root.Position - r.Position).Magnitude
-                if d < dist then dist = d; nearest = obj end
+        if obj:IsA("Model") and not Players:GetPlayerFromCharacter(obj) then
+            local hum  = obj:FindFirstChildOfClass("Humanoid")
+            local root = obj:FindFirstChild("HumanoidRootPart")
+            if hum and hum.Health > 0 and root and isMobOfZone(obj, zone) then
+                local d = (fromPos - root.Position).Magnitude
+                if d < radius and d < bestDist then
+                    bestDist = d
+                    best = obj
+                end
             end
         end
     end
-    return nearest
+    return best
 end
 
-local farmConnection
-local function startAutoFarm()
-    if farmConnection then farmConnection:Disconnect() end
-    farmConnection = RunService.Heartbeat:Connect(function()
-        if not State.autoFarm then return end
-        local root = getRoot()
-        local hum  = getHum()
-        if not root or not hum or hum.Health <= 0 then return end
-        local mob = getNearestMob()
-        if not mob then return end
-        local mobRoot = mob:FindFirstChild("HumanoidRootPart")
-        if not mobRoot then return end
-        local dist = (root.Position - mobRoot.Position).Magnitude
-        if dist > 10 then
-            root.CFrame = CFrame.new(mobRoot.Position + Vector3.new(0, 3, 4))
+-- Loop principal do farm — task loop, não Heartbeat
+local farmRunning = false
+local function farmLoop()
+    if farmRunning then return end
+    farmRunning = true
+    task.spawn(function()
+        while farmRunning do
+            if not State.autoFarm then task.wait(0.5) continue end
+
+            local root = getRoot()
+            local hum  = getHum()
+            if not root or not hum or hum.Health <= 0 then
+                task.wait(0.5)
+                continue
+            end
+
+            local lv   = getLevel()
+            local zone = getZoneForLevel(lv)
+            State.currentZone = zone
+
+            -- Verifica se já está perto da zona (dentro de 500 studs do centro)
+            local distToZone = (root.Position - zone.pos).Magnitude
+            if distToZone > 500 then
+                -- Teleporta uma única vez para a zona
+                root.CFrame = CFrame.new(zone.pos + Vector3.new(0, 3, 0))
+                task.wait(0.8)
+            end
+
+            -- Busca um mob da zona no raio local
+            local mob = getMobInZone(zone, root.Position, 250)
+            if not mob then
+                -- Nenhum mob encontrado perto; re-centraliza na zona e aguarda spawn
+                root.CFrame = CFrame.new(zone.pos + Vector3.new(math.random(-30,30), 3, math.random(-30,30)))
+                task.wait(1)
+                continue
+            end
+
+            local mobRoot = mob:FindFirstChild("HumanoidRootPart")
+            if not mobRoot then task.wait(0.3) continue end
+
+            -- Posiciona perto do mob para atacar
+            local attackPos = mobRoot.Position + Vector3.new(0, 3, 4)
+            root.CFrame = CFrame.new(attackPos)
+            task.wait(0.1)
+
+            -- Tenta click detector
+            local cd = mobRoot:FindFirstChildOfClass("ClickDetector")
+                    or mob:FindFirstChildOfClass("ClickDetector")
+            if cd then
+                pcall(function() fireclickdetector(cd) end)
+            end
+
+            -- Auto skill no mesmo mob
+            if State.autoSkill then
+                local SKILL_KEYS = {
+                    Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three,
+                    Enum.KeyCode.Four, Enum.KeyCode.F, Enum.KeyCode.G
+                }
+                for _, key in pairs(SKILL_KEYS) do
+                    pcall(function()
+                        fireinputevent(Enum.UserInputType.Keyboard, key, Enum.UserInputState.Begin)
+                        task.wait(0.04)
+                        fireinputevent(Enum.UserInputType.Keyboard, key, Enum.UserInputState.End)
+                    end)
+                end
+            end
+
+            task.wait(0.25)
         end
-        local cd = mobRoot:FindFirstChildOfClass("ClickDetector")
-            or mob:FindFirstChildOfClass("ClickDetector")
-        if cd then pcall(function() fireclickdetector(cd) end) end
     end)
 end
 
--- ── Auto Collect Fruit ────────────────────────────────────────────────────────
+local function stopFarm()
+    farmRunning = false
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- AUTO COLLECT FRUIT
+-- ─────────────────────────────────────────────────────────────────────────────
 local function doAutoCollectFruit()
     if not State.autoCollectFruit then return end
     local root = getRoot()
@@ -225,32 +345,9 @@ local function doAutoCollectFruit()
     end
 end
 
--- ── Auto Skill ────────────────────────────────────────────────────────────────
-local SKILL_KEYS = {
-    Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three,
-    Enum.KeyCode.Four, Enum.KeyCode.F, Enum.KeyCode.G
-}
-local function doAutoSkill()
-    if not State.autoSkill then return end
-    local mob = getNearestMob()
-    if not mob then return end
-    local root = getRoot()
-    if not root then return end
-    local mobPart = mob:FindFirstChild("HumanoidRootPart") or mob.PrimaryPart
-    if not mobPart then return end
-    local dist = (root.Position - mobPart.Position).Magnitude
-    if dist < 60 then
-        for _, key in pairs(SKILL_KEYS) do
-            pcall(function()
-                fireinputevent(Enum.UserInputType.Keyboard, key, Enum.UserInputState.Begin)
-                task.wait(0.05)
-                fireinputevent(Enum.UserInputType.Keyboard, key, Enum.UserInputState.End)
-            end)
-        end
-    end
-end
-
--- ── Fly ───────────────────────────────────────────────────────────────────────
+-- ─────────────────────────────────────────────────────────────────────────────
+-- FLY
+-- ─────────────────────────────────────────────────────────────────────────────
 local flyBody
 local function enableFly()
     local root = getRoot()
@@ -297,13 +394,17 @@ local function disableFly()
     if hum then hum.PlatformStand = false end
 end
 
--- ── Speed ─────────────────────────────────────────────────────────────────────
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SPEED
+-- ─────────────────────────────────────────────────────────────────────────────
 local function applySpeed()
     local hum = getHum()
     if hum then hum.WalkSpeed = State.speed and State.speedValue or 16 end
 end
 
--- ── Anti AFK ─────────────────────────────────────────────────────────────────
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ANTI AFK
+-- ─────────────────────────────────────────────────────────────────────────────
 local afkConn
 local function startAntiAfk()
     if afkConn then afkConn:Disconnect() end
@@ -316,20 +417,45 @@ local function startAntiAfk()
     end)
 end
 
--- ── Teleport ─────────────────────────────────────────────────────────────────
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TELEPORT
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Ilhas separadas por sea para identificação visual
 local ISLANDS = {
-    ["Ilha Inicial"]       = Vector3.new(0, 100, 0),
-    ["Ilha Buggy"]         = Vector3.new(1200, 100, -400),
-    ["Ilha Zoro"]          = Vector3.new(-800, 100, 600),
-    ["Ilha Shanks"]        = Vector3.new(3000, 100, 500),
-    ["Ilha Gran Line"]     = Vector3.new(4000, 100, 0),
-    ["Sky Island"]         = Vector3.new(0, 500, 2000),
-    ["Ilha do Treino"]     = Vector3.new(-2000, 100, 1500),
-    ["Marine HQ"]          = Vector3.new(2500, 100, -1000),
-    ["Ilha do Tesouro"]    = Vector3.new(1800, 100, 1800),
-    ["Ilha Marinheiro"]    = Vector3.new(500, 100, 300),
-    ["Ilha Luffy"]         = Vector3.new(-1500, 100, -800),
-    ["Ilha Nami"]          = Vector3.new(2000, 100, 100),
+    ["1st"] = {
+        ["Ilha Inicial"]    = Vector3.new(0,     100,  0),
+        ["Ilha Buggy"]      = Vector3.new(1200,  100, -400),
+        ["Ilha Zoro"]       = Vector3.new(-800,  100,  600),
+        ["Ilha Nami"]       = Vector3.new(2000,  100,  100),
+        ["Marine HQ"]       = Vector3.new(2500,  100, -1000),
+        ["Sky Island"]      = Vector3.new(0,     500,  2000),
+        ["Ilha Shanks"]     = Vector3.new(3000,  100,  500),
+        ["Ilha do Treino"]  = Vector3.new(-2000, 100,  1500),
+        ["Ilha Luffy"]      = Vector3.new(-1500, 100, -800),
+        ["Ilha Marinheiro"] = Vector3.new(500,   100,  300),
+        ["Ilha Tesouro"]    = Vector3.new(1800,  100,  1800),
+        ["Gran Line Entry"] = Vector3.new(4000,  100,  0),
+    },
+    ["2nd"] = {
+        ["Alabasta"]        = Vector3.new(5000,  100,  1000),
+        ["Skypiea (2nd)"]   = Vector3.new(5200,  500,  600),
+        ["Thriller Bark"]   = Vector3.new(5500,  100, -800),
+        ["Marine HQ (2nd)"] = Vector3.new(6000,  100, -400),
+        ["Dressrosa"]       = Vector3.new(6200,  100,  400),
+        ["Marineford"]      = Vector3.new(7000,  100,  0),
+        ["Punk Hazard"]     = Vector3.new(7800,  100, -1200),
+        ["Fishman Island"]  = Vector3.new(8000,  -300, 0),
+    },
+    ["3rd"] = {
+        ["Wano"]            = Vector3.new(9500,  100,  600),
+        ["Onigashima"]      = Vector3.new(10200, 100,  200),
+        ["Elbaf"]           = Vector3.new(11000, 100, -500),
+        ["Laugh Tale"]      = Vector3.new(11800, 100,  800),
+        ["Ilha Final (3rd)"]= Vector3.new(12000, 100,  0),
+        ["New Marineford"]  = Vector3.new(9000,  100, -900),
+        ["Hachinosu"]       = Vector3.new(10800, 100,  1200),
+        ["Egghead"]         = Vector3.new(12500, 100, -600),
+    },
 }
 
 local function teleport(pos)
@@ -337,7 +463,9 @@ local function teleport(pos)
     if root then root.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0)) end
 end
 
--- ── Loop principal ────────────────────────────────────────────────────────────
+-- ─────────────────────────────────────────────────────────────────────────────
+-- HEARTBEAT — só ESP timer, stats e speed (sem farm)
+-- ─────────────────────────────────────────────────────────────────────────────
 local espTimer = 0
 RunService.Heartbeat:Connect(function(dt)
     espTimer = espTimer + dt
@@ -357,11 +485,9 @@ RunService.Heartbeat:Connect(function(dt)
         end
     end
     doAutoCollectFruit()
-    doAutoSkill()
     if State.speed then applySpeed() end
 end)
 
-startAutoFarm()
 startAntiAfk()
 
 -- ═══════════════════════════════════════════════════════════════════════════════
@@ -385,6 +511,9 @@ local C = {
     toggleOn = Color3.fromRGB(50, 200, 100),
     toggleOff= Color3.fromRGB(50, 50, 70),
     dark     = Color3.fromRGB(14, 14, 20),
+    sea1     = Color3.fromRGB(50, 150, 220),
+    sea2     = Color3.fromRGB(50, 200, 130),
+    sea3     = Color3.fromRGB(200, 100, 50),
 }
 
 local function corner(parent, r)
@@ -453,7 +582,10 @@ closeBtn.Font = Enum.Font.GothamBold
 closeBtn.TextSize = 13
 closeBtn.BorderSizePixel = 0
 corner(closeBtn, 4)
-closeBtn.MouseButton1Click:Connect(function() sg:Destroy() end)
+closeBtn.MouseButton1Click:Connect(function()
+    stopFarm()
+    sg:Destroy()
+end)
 
 -- Drag
 local dragging, dragStart, startPos
@@ -575,12 +707,14 @@ local function simpleBtn(parent, text, onClick, order)
     return btn
 end
 
-local function sectionTitle(parent, text, order)
+local function sectionTitle(parent, text, color, order)
     local lbl = Instance.new("TextLabel", parent)
     lbl.Size = UDim2.new(1, -12, 0, 20)
-    lbl.BackgroundColor3 = C.accentDim
+    lbl.BackgroundColor3 = color and Color3.fromRGB(
+        math.floor(color.R*40), math.floor(color.G*40), math.floor(color.B*40)
+    ) or C.accentDim
     lbl.Text = "  " .. text
-    lbl.TextColor3 = C.accent
+    lbl.TextColor3 = color or C.accent
     lbl.Font = Enum.Font.GothamBold
     lbl.TextSize = 11
     lbl.BorderSizePixel = 0
@@ -594,19 +728,73 @@ end
 -- ABA AUTO FARM
 -- ═══════════════════════════════════════════════════════════════
 local afPage = tabPages["AUTO FARM"]
-sectionTitle(afPage, "FARM", 1)
-toggleRow(afPage, "Auto Farm", "Ataca mob mais proximo", function(v) State.autoFarm = v end, 2)
-toggleRow(afPage, "Auto Skill", "Usa habilidades em combate", function(v) State.autoSkill = v end, 3)
-toggleRow(afPage, "Auto Collect Fruit", "Coleta frutas no mapa", function(v) State.autoCollectFruit = v end, 4)
-sectionTitle(afPage, "BOSSES / SEA", 5)
-toggleRow(afPage, "Auto Sea Beast", "Farm Sea Beast", function(v) State.autoSeaBeast = v end, 6)
-toggleRow(afPage, "Auto Raid", "Entra e farma raids", function(v) State.autoRaid = v end, 7)
+
+-- Info do level / zona atual
+local zoneInfoFrame = Instance.new("Frame", afPage)
+zoneInfoFrame.Size = UDim2.new(1, -12, 0, 52)
+zoneInfoFrame.BackgroundColor3 = C.panel
+zoneInfoFrame.BorderSizePixel = 0
+zoneInfoFrame.LayoutOrder = 1
+corner(zoneInfoFrame, 6)
+local zoneStroke = Instance.new("UIStroke", zoneInfoFrame)
+zoneStroke.Color = C.accent
+zoneStroke.Thickness = 1
+
+local zoneLvLabel = label(zoneInfoFrame, "Level: --", 11, C.textDim)
+zoneLvLabel.Size = UDim2.new(0.5, -10, 0, 18)
+zoneLvLabel.Position = UDim2.new(0, 10, 0, 6)
+
+local zoneNameLabel = label(zoneInfoFrame, "Zona: --", 11, C.text, Enum.Font.GothamBold)
+zoneNameLabel.Size = UDim2.new(1, -10, 0, 18)
+zoneNameLabel.Position = UDim2.new(0, 10, 0, 28)
+
+local zoneSeaLabel = label(zoneInfoFrame, "", 10, C.textDim)
+zoneSeaLabel.Size = UDim2.new(0.5, 0, 0, 18)
+zoneSeaLabel.Position = UDim2.new(0.5, 0, 0, 6)
+zoneSeaLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+-- Atualiza info a cada segundo
+task.spawn(function()
+    while true do
+        task.wait(1)
+        local lv   = getLevel()
+        local zone = getZoneForLevel(lv)
+        zoneLvLabel.Text  = "Level: " .. lv
+        zoneNameLabel.Text = "Zona: " .. zone.name
+        local seaColor = zone.sea == "1st" and C.sea1 or zone.sea == "2nd" and C.sea2 or C.sea3
+        zoneSeaLabel.Text      = zone.sea .. " Sea"
+        zoneSeaLabel.TextColor3 = seaColor
+        zoneStroke.Color = seaColor
+    end
+end)
+
+sectionTitle(afPage, "FARM", nil, 2)
+
+toggleRow(afPage, "Auto Farm", "Farm automatico pela zona do seu level", function(v)
+    State.autoFarm = v
+    if v then
+        farmRunning = false
+        farmLoop()
+    end
+end, 3)
+
+toggleRow(afPage, "Auto Skill", "Usa habilidades durante o farm", function(v)
+    State.autoSkill = v
+end, 4)
+
+toggleRow(afPage, "Auto Collect Fruit", "Coleta frutas proximas no mapa", function(v)
+    State.autoCollectFruit = v
+end, 5)
+
+sectionTitle(afPage, "BOSSES / SEA", nil, 6)
+toggleRow(afPage, "Auto Sea Beast", "Farm Sea Beast", function(v) State.autoSeaBeast = v end, 7)
+toggleRow(afPage, "Auto Raid", "Entra e farma raids", function(v) State.autoRaid = v end, 8)
 
 -- ═══════════════════════════════════════════════════════════════
 -- ABA ESP
 -- ═══════════════════════════════════════════════════════════════
 local espPage = tabPages["ESP"]
-sectionTitle(espPage, "VISIBILIDADE", 1)
+sectionTitle(espPage, "VISIBILIDADE", nil, 1)
 toggleRow(espPage, "Fruit ESP", "Boxes nas frutas do mapa", function(v)
     State.fruitESP = v; if not v then clearESP("fruit") end end, 2)
 toggleRow(espPage, "Player ESP", "Boxes em outros jogadores", function(v)
@@ -625,17 +813,60 @@ simpleBtn(espPage, "LIMPAR ESP", function()
 end, 7)
 
 -- ═══════════════════════════════════════════════════════════════
--- ABA TELEPORT
+-- ABA TELEPORT — separado por sea
 -- ═══════════════════════════════════════════════════════════════
 local tpPage = tabPages["TELEPORT"]
-sectionTitle(tpPage, "ILHAS", 1)
-local tpOrder = 2
-for name, pos in pairs(ISLANDS) do
-    local captured = pos
-    simpleBtn(tpPage, name, function() teleport(captured) end, tpOrder)
+local tpOrder = 1
+
+local seaConfig = {
+    { key="1st", label="1ST SEA  —  East Blue", color=C.sea1 },
+    { key="2nd", label="2ND SEA  —  Grand Line", color=C.sea2 },
+    { key="3rd", label="3RD SEA  —  New World", color=C.sea3 },
+}
+
+for _, sc in pairs(seaConfig) do
+    sectionTitle(tpPage, sc.label, sc.color, tpOrder)
     tpOrder = tpOrder + 1
+    for name, pos in pairs(ISLANDS[sc.key]) do
+        local captured = pos
+        local btn = Instance.new("TextButton", tpPage)
+        btn.Size = UDim2.new(1, -12, 0, 32)
+        btn.BackgroundColor3 = Color3.fromRGB(
+            math.floor(sc.color.R*0.12*255),
+            math.floor(sc.color.G*0.12*255),
+            math.floor(sc.color.B*0.12*255)
+        )
+        btn.Text = name
+        btn.TextColor3 = sc.color
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 11
+        btn.BorderSizePixel = 0
+        btn.LayoutOrder = tpOrder
+        corner(btn, 5)
+        local bs = Instance.new("UIStroke", btn)
+        bs.Color = Color3.fromRGB(
+            math.floor(sc.color.R*0.3*255),
+            math.floor(sc.color.G*0.3*255),
+            math.floor(sc.color.B*0.3*255)
+        )
+        bs.Thickness = 1
+        btn.MouseButton1Click:Connect(function()
+            tween(btn, {BackgroundColor3 = sc.color})
+            task.delay(0.25, function()
+                tween(btn, {BackgroundColor3 = Color3.fromRGB(
+                    math.floor(sc.color.R*0.12*255),
+                    math.floor(sc.color.G*0.12*255),
+                    math.floor(sc.color.B*0.12*255)
+                )})
+            end)
+            teleport(captured)
+        end)
+        tpOrder = tpOrder + 1
+    end
 end
-sectionTitle(tpPage, "COORDENADAS MANUAIS", tpOrder)
+
+-- Coordenadas manuais
+sectionTitle(tpPage, "COORDENADAS MANUAIS", nil, tpOrder)
 local coordRow = Instance.new("Frame", tpPage)
 coordRow.Size = UDim2.new(1, -12, 0, 80)
 coordRow.BackgroundColor3 = C.panel
@@ -676,7 +907,7 @@ end)
 -- ABA STATS
 -- ═══════════════════════════════════════════════════════════════
 local stPage = tabPages["STATS"]
-sectionTitle(stPage, "AUTO STATS", 1)
+sectionTitle(stPage, "AUTO STATS", nil, 1)
 toggleRow(stPage, "Auto Stats", "Aloca pontos na stat selecionada", function(v) State.autoStats = v end, 2)
 local statRow = Instance.new("Frame", stPage)
 statRow.Size = UDim2.new(1, -12, 0, 70)
@@ -713,7 +944,7 @@ end
 -- ABA MISC
 -- ═══════════════════════════════════════════════════════════════
 local msPage = tabPages["MISC"]
-sectionTitle(msPage, "MOVIMENTO", 1)
+sectionTitle(msPage, "MOVIMENTO", nil, 1)
 toggleRow(msPage, "Fly", "Voa com WASD / Space / Ctrl", function(v)
     State.fly = v
     if v then enableFly() else disableFly() end
@@ -744,7 +975,7 @@ speedBox:GetPropertyChangedSignal("Text"):Connect(function()
     local n = tonumber(speedBox.Text)
     if n then State.speedValue = n; applySpeed() end
 end)
-sectionTitle(msPage, "UTILIDADES", 5)
+sectionTitle(msPage, "UTILIDADES", nil, 5)
 toggleRow(msPage, "Anti AFK", "Previne kick por inatividade", function(v) State.antiAfk = v end, 6)
 toggleRow(msPage, "No Cooldown", "Remove cooldown de habilidades", function(v)
     State.noCooldown = v
@@ -841,5 +1072,9 @@ lp.CharacterAdded:Connect(function(char)
     task.wait(1)
     if State.speed then applySpeed() end
     if State.fly   then enableFly()  end
+    if State.autoFarm then
+        farmRunning = false
+        farmLoop()
+    end
     notify("Personagem respawnado")
 end)
