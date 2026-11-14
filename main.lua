@@ -1,4 +1,4 @@
--- NTT HUB | King Legacy Script v2.1
+-- NTT HUB | King Legacy Script v2.2
 -- github.com/wallysoncarvalho2009-cloud/script-lua
 -- Sem key — execucao direta
 
@@ -24,10 +24,8 @@ local function tween(inst, goal, t)
     TweenService:Create(inst, TweenInfo.new(t or 0.15), goal):Play()
 end
 
--- Retorna o level atual — varre todos os folders do player procurando IntValue/NumberValue com nome de level
 local function getLevel()
     local NAMES = {"Level","level","Lv","lv","LV","Nivel","nivel","Rank","rank","lvl","Lvl"}
-    -- tenta leaderstats primeiro
     local stats = lp:FindFirstChild("leaderstats")
     if stats then
         for _, n in pairs(NAMES) do
@@ -36,14 +34,12 @@ local function getLevel()
                 return math.floor(v.Value)
             end
         end
-        -- qualquer IntValue/NumberValue com valor razoavel
         for _, v in pairs(stats:GetChildren()) do
             if (v:IsA("IntValue") or v:IsA("NumberValue")) and v.Value > 0 and v.Value < 100000 then
                 return math.floor(v.Value)
             end
         end
     end
-    -- varre todos os filhos diretos do player
     for _, folder in pairs(lp:GetChildren()) do
         if folder:IsA("Folder") or folder:IsA("Configuration") or folder.Name:lower():find("stat") then
             for _, n in pairs(NAMES) do
@@ -53,7 +49,6 @@ local function getLevel()
                 end
             end
         end
-        -- IntValue direto no player
         if (folder:IsA("IntValue") or folder:IsA("NumberValue")) then
             for _, n in pairs(NAMES) do
                 if folder.Name == n and folder.Value > 0 then
@@ -65,12 +60,7 @@ local function getLevel()
     return 0
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
--- ZONAS POR LEVEL (King Legacy — coordenadas e nomes parciais dos mobs)
--- sea: "1st" | "2nd" | "3rd"
--- ─────────────────────────────────────────────────────────────────────────────
 local LEVEL_ZONES = {
-    -- 1st Sea ─────────────────────────────────────────────────────────────────
     { min=0,    max=50,   sea="1st", name="Ilha Inicial",        pos=Vector3.new(0,     100,  0),    mobs={"Bandit","Pirate","Villager"} },
     { min=50,   max=100,  sea="1st", name="Ilha Buggy",          pos=Vector3.new(1200,  100, -400),   mobs={"Buggy","Clown","Pirate"} },
     { min=100,  max=200,  sea="1st", name="Ilha Zoro",           pos=Vector3.new(-800,  100,  600),   mobs={"Dojo","Swordsman","Trainee"} },
@@ -79,15 +69,11 @@ local LEVEL_ZONES = {
     { min=500,  max=700,  sea="1st", name="Sky Island",          pos=Vector3.new(0,     500,  2000),  mobs={"God","Shandian","Warrior"} },
     { min=700,  max=900,  sea="1st", name="Ilha Shanks",         pos=Vector3.new(3000,  100,  500),   mobs={"Shanks","RedHair","Crew"} },
     { min=900,  max=1100, sea="1st", name="Ilha do Treino",      pos=Vector3.new(-2000, 100,  1500),  mobs={"Trainee","Fighter","Guard"} },
-
-    -- 2nd Sea ─────────────────────────────────────────────────────────────────
     { min=1100, max=1400, sea="2nd", name="Alabasta",            pos=Vector3.new(5000,  100,  1000),  mobs={"Rebel","Guard","Soldier"} },
     { min=1400, max=1700, sea="2nd", name="Thriller Bark",       pos=Vector3.new(5500,  100, -800),   mobs={"Zombie","Mast","Soldier"} },
     { min=1700, max=2000, sea="2nd", name="Dressrosa (entrada)", pos=Vector3.new(6200,  100,  400),   mobs={"Toys","Toy","Guard"} },
     { min=2000, max=2400, sea="2nd", name="Marineford",          pos=Vector3.new(7000,  100,  0),     mobs={"Admiral","Marine","Officer"} },
     { min=2400, max=2800, sea="2nd", name="Punk Hazard",         pos=Vector3.new(7800,  100, -1200),  mobs={"Dragon","Smoker","Gas"} },
-
-    -- 3rd Sea ─────────────────────────────────────────────────────────────────
     { min=2800, max=3200, sea="3rd", name="Wano",                pos=Vector3.new(9500,  100,  600),   mobs={"Samurai","Orochi","Guard"} },
     { min=3200, max=3700, sea="3rd", name="Onigashima",          pos=Vector3.new(10200, 100,  200),   mobs={"Beast","Kaido","Pirate"} },
     { min=3700, max=4200, sea="3rd", name="Elbaf",               pos=Vector3.new(11000, 100, -500),   mobs={"Giant","Viking","Warrior"} },
@@ -101,9 +87,6 @@ local function getZoneForLevel(lv)
     return LEVEL_ZONES[#LEVEL_ZONES]
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
--- STATE
--- ─────────────────────────────────────────────────────────────────────────────
 local State = {
     autoFarm         = false,
     autoStats        = false,
@@ -244,11 +227,8 @@ local function updateNpcESP()
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- AUTO FARM — por level
--- Encontra mobs da zona correta para o level atual, não o nearest global
+-- AUTO FARM
 -- ─────────────────────────────────────────────────────────────────────────────
-
--- Verifica se um modelo corresponde aos mobs da zona
 local function isMobOfZone(model, zone)
     local name = model.Name:lower()
     for _, keyword in pairs(zone.mobs) do
@@ -257,8 +237,6 @@ local function isMobOfZone(model, zone)
     return false
 end
 
--- Busca um mob vivo da zona dentro de um raio
--- Se nenhum mob bater pelo nome da zona, retorna o nearest vivo no raio (fallback)
 local function getMobInZone(zone, fromPos, radius)
     radius = radius or 300
     local best, bestDist = nil, math.huge
@@ -270,25 +248,15 @@ local function getMobInZone(zone, fromPos, radius)
             if hum and hum.Health > 0 and root then
                 local d = (fromPos - root.Position).Magnitude
                 if d < radius then
-                    -- fallback: qualquer mob vivo no raio
-                    if d < fallbackDist then
-                        fallbackDist = d
-                        fallback = obj
-                    end
-                    -- preferencial: mob da zona pelo nome
-                    if isMobOfZone(obj, zone) and d < bestDist then
-                        bestDist = d
-                        best = obj
-                    end
+                    if d < fallbackDist then fallbackDist = d; fallback = obj end
+                    if isMobOfZone(obj, zone) and d < bestDist then bestDist = d; best = obj end
                 end
             end
         end
     end
-    -- retorna o mob da zona se encontrado, senão qualquer mob vivo próximo
     return best or fallback
 end
 
--- Loop principal do farm — task loop, não Heartbeat
 local farmRunning = false
 local function farmLoop()
     if farmRunning then return end
@@ -296,51 +264,29 @@ local function farmLoop()
     task.spawn(function()
         while farmRunning do
             if not State.autoFarm then task.wait(0.5) continue end
-
             local root = getRoot()
             local hum  = getHum()
-            if not root or not hum or hum.Health <= 0 then
-                task.wait(0.5)
-                continue
-            end
-
+            if not root or not hum or hum.Health <= 0 then task.wait(0.5) continue end
             local lv   = getLevel()
             local zone = getZoneForLevel(lv)
             State.currentZone = zone
-
-            -- Verifica se já está perto da zona (dentro de 500 studs do centro)
             local distToZone = (root.Position - zone.pos).Magnitude
             if distToZone > 500 then
-                -- Teleporta uma única vez para a zona
                 root.CFrame = CFrame.new(zone.pos + Vector3.new(0, 3, 0))
                 task.wait(0.8)
             end
-
-            -- Busca um mob da zona no raio local
             local mob = getMobInZone(zone, root.Position, 250)
             if not mob then
-                -- Nenhum mob encontrado perto; re-centraliza na zona e aguarda spawn
                 root.CFrame = CFrame.new(zone.pos + Vector3.new(math.random(-30,30), 3, math.random(-30,30)))
                 task.wait(1)
                 continue
             end
-
             local mobRoot = mob:FindFirstChild("HumanoidRootPart")
             if not mobRoot then task.wait(0.3) continue end
-
-            -- Posiciona perto do mob para atacar
-            local attackPos = mobRoot.Position + Vector3.new(0, 3, 4)
-            root.CFrame = CFrame.new(attackPos)
+            root.CFrame = CFrame.new(mobRoot.Position + Vector3.new(0, 3, 4))
             task.wait(0.1)
-
-            -- Tenta click detector
-            local cd = mobRoot:FindFirstChildOfClass("ClickDetector")
-                    or mob:FindFirstChildOfClass("ClickDetector")
-            if cd then
-                pcall(function() fireclickdetector(cd) end)
-            end
-
-            -- Auto skill no mesmo mob
+            local cd = mobRoot:FindFirstChildOfClass("ClickDetector") or mob:FindFirstChildOfClass("ClickDetector")
+            if cd then pcall(function() fireclickdetector(cd) end) end
             if State.autoSkill then
                 local SKILL_KEYS = {
                     Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three,
@@ -354,15 +300,12 @@ local function farmLoop()
                     end)
                 end
             end
-
             task.wait(0.25)
         end
     end)
 end
 
-local function stopFarm()
-    farmRunning = false
-end
+local function stopFarm() farmRunning = false end
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- AUTO COLLECT FRUIT
@@ -464,7 +407,6 @@ end
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TELEPORT
 -- ─────────────────────────────────────────────────────────────────────────────
--- Ilhas separadas por sea para identificação visual
 local ISLANDS = {
     ["1st"] = {
         ["Ilha Inicial"]    = Vector3.new(0,     100,  0),
@@ -491,14 +433,14 @@ local ISLANDS = {
         ["Fishman Island"]  = Vector3.new(8000,  -300, 0),
     },
     ["3rd"] = {
-        ["Wano"]            = Vector3.new(9500,  100,  600),
-        ["Onigashima"]      = Vector3.new(10200, 100,  200),
-        ["Elbaf"]           = Vector3.new(11000, 100, -500),
-        ["Laugh Tale"]      = Vector3.new(11800, 100,  800),
-        ["Ilha Final (3rd)"]= Vector3.new(12000, 100,  0),
-        ["New Marineford"]  = Vector3.new(9000,  100, -900),
-        ["Hachinosu"]       = Vector3.new(10800, 100,  1200),
-        ["Egghead"]         = Vector3.new(12500, 100, -600),
+        ["Wano"]             = Vector3.new(9500,  100,  600),
+        ["Onigashima"]       = Vector3.new(10200, 100,  200),
+        ["Elbaf"]            = Vector3.new(11000, 100, -500),
+        ["Laugh Tale"]       = Vector3.new(11800, 100,  800),
+        ["Ilha Final (3rd)"] = Vector3.new(12000, 100,  0),
+        ["New Marineford"]   = Vector3.new(9000,  100, -900),
+        ["Hachinosu"]        = Vector3.new(10800, 100,  1200),
+        ["Egghead"]          = Vector3.new(12500, 100, -600),
     },
 }
 
@@ -508,17 +450,14 @@ local function teleport(pos)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- HEARTBEAT — só ESP timer, stats e speed (sem farm)
+-- HEARTBEAT
 -- ─────────────────────────────────────────────────────────────────────────────
 local espTimer = 0
 RunService.Heartbeat:Connect(function(dt)
     espTimer = espTimer + dt
     if espTimer >= 3 then
         espTimer = 0
-        updateFruitESP()
-        updatePlayerESP()
-        updateBossESP()
-        updateNpcESP()
+        updateFruitESP(); updatePlayerESP(); updateBossESP(); updateNpcESP()
     end
     if State.autoStats then
         for _, v in pairs(game:GetDescendants()) do
@@ -577,7 +516,6 @@ local function label(parent, text, size, color, font)
     return l
 end
 
--- Janela principal
 local mainFrame = Instance.new("Frame", sg)
 mainFrame.Size = UDim2.new(0, 520, 0, 420)
 mainFrame.Position = UDim2.new(0.5, -260, 0.5, -210)
@@ -588,7 +526,6 @@ local mainStroke = Instance.new("UIStroke", mainFrame)
 mainStroke.Color = C.accent
 mainStroke.Thickness = 1.5
 
--- Topbar
 local topbar = Instance.new("Frame", mainFrame)
 topbar.Size = UDim2.new(1, 0, 0, 36)
 topbar.BackgroundColor3 = C.dark
@@ -599,7 +536,7 @@ local titleLbl = Instance.new("TextLabel", topbar)
 titleLbl.Size = UDim2.new(1, -80, 1, 0)
 titleLbl.Position = UDim2.new(0, 14, 0, 0)
 titleLbl.BackgroundTransparency = 1
-titleLbl.Text = "NTT HUB  |  King Legacy  |  v2.1"
+titleLbl.Text = "NTT HUB  |  King Legacy  |  v2.2"
 titleLbl.TextColor3 = C.accent
 titleLbl.Font = Enum.Font.GothamBold
 titleLbl.TextSize = 13
@@ -631,7 +568,6 @@ closeBtn.MouseButton1Click:Connect(function()
     sg:Destroy()
 end)
 
--- Drag
 local dragging, dragStart, startPos
 topbar.InputBegan:Connect(function(inp)
     if inp.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -657,14 +593,12 @@ minBtn.MouseButton1Click:Connect(function()
     mainFrame.Size = minimized and UDim2.new(0, 520, 0, 36) or UDim2.new(0, 520, 0, 420)
 end)
 
--- Conteudo
 contentArea = Instance.new("Frame", mainFrame)
 contentArea.Size = UDim2.new(1, 0, 1, -36)
 contentArea.Position = UDim2.new(0, 0, 0, 36)
 contentArea.BackgroundTransparency = 1
 contentArea.BorderSizePixel = 0
 
--- Sidebar
 local sidebar = Instance.new("Frame", contentArea)
 sidebar.Size = UDim2.new(0, 110, 1, 0)
 sidebar.BackgroundColor3 = C.dark
@@ -695,7 +629,6 @@ for _, name in pairs(tabNames) do
     tabPages[name] = page
 end
 
--- Helpers GUI
 local function toggleRow(parent, text, desc, onToggle, order)
     local row = Instance.new("Frame", parent)
     row.Size = UDim2.new(1, -12, 0, 52)
@@ -773,7 +706,6 @@ end
 -- ═══════════════════════════════════════════════════════════════
 local afPage = tabPages["AUTO FARM"]
 
--- Info do level / zona atual
 local zoneInfoFrame = Instance.new("Frame", afPage)
 zoneInfoFrame.Size = UDim2.new(1, -12, 0, 52)
 zoneInfoFrame.BackgroundColor3 = C.panel
@@ -797,39 +729,27 @@ zoneSeaLabel.Size = UDim2.new(0.5, 0, 0, 18)
 zoneSeaLabel.Position = UDim2.new(0.5, 0, 0, 6)
 zoneSeaLabel.TextXAlignment = Enum.TextXAlignment.Right
 
--- Atualiza info a cada segundo
 task.spawn(function()
     while true do
         task.wait(1)
         local lv   = getLevel()
         local zone = getZoneForLevel(lv)
-        zoneLvLabel.Text  = lv > 0 and ("Level: " .. lv) or "Level: (lendo...)"
+        zoneLvLabel.Text   = lv > 0 and ("Level: " .. lv) or "Level: (lendo...)"
         zoneNameLabel.Text = "Zona: " .. zone.name
         local seaColor = zone.sea == "1st" and C.sea1 or zone.sea == "2nd" and C.sea2 or C.sea3
-        zoneSeaLabel.Text      = zone.sea .. " Sea"
+        zoneSeaLabel.Text       = zone.sea .. " Sea"
         zoneSeaLabel.TextColor3 = seaColor
-        zoneStroke.Color = seaColor
+        zoneStroke.Color        = seaColor
     end
 end)
 
 sectionTitle(afPage, "FARM", nil, 2)
-
 toggleRow(afPage, "Auto Farm", "Farm automatico pela zona do seu level", function(v)
     State.autoFarm = v
-    if v then
-        farmRunning = false
-        farmLoop()
-    end
+    if v then farmRunning = false; farmLoop() end
 end, 3)
-
-toggleRow(afPage, "Auto Skill", "Usa habilidades durante o farm", function(v)
-    State.autoSkill = v
-end, 4)
-
-toggleRow(afPage, "Auto Collect Fruit", "Coleta frutas proximas no mapa", function(v)
-    State.autoCollectFruit = v
-end, 5)
-
+toggleRow(afPage, "Auto Skill", "Usa habilidades durante o farm", function(v) State.autoSkill = v end, 4)
+toggleRow(afPage, "Auto Collect Fruit", "Coleta frutas proximas no mapa", function(v) State.autoCollectFruit = v end, 5)
 sectionTitle(afPage, "BOSSES / SEA", nil, 6)
 toggleRow(afPage, "Auto Sea Beast", "Farm Sea Beast", function(v) State.autoSeaBeast = v end, 7)
 toggleRow(afPage, "Auto Raid", "Entra e farma raids", function(v) State.autoRaid = v end, 8)
@@ -857,15 +777,15 @@ simpleBtn(espPage, "LIMPAR ESP", function()
 end, 7)
 
 -- ═══════════════════════════════════════════════════════════════
--- ABA TELEPORT — separado por sea
+-- ABA TELEPORT
 -- ═══════════════════════════════════════════════════════════════
 local tpPage = tabPages["TELEPORT"]
 local tpOrder = 1
 
 local seaConfig = {
-    { key="1st", label="1ST SEA  —  East Blue", color=C.sea1 },
+    { key="1st", label="1ST SEA  —  East Blue",  color=C.sea1 },
     { key="2nd", label="2ND SEA  —  Grand Line", color=C.sea2 },
-    { key="3rd", label="3RD SEA  —  New World", color=C.sea3 },
+    { key="3rd", label="3RD SEA  —  New World",  color=C.sea3 },
 }
 
 for _, sc in pairs(seaConfig) do
@@ -909,19 +829,21 @@ for _, sc in pairs(seaConfig) do
     end
 end
 
--- Coordenadas manuais
+-- Coordenadas manuais — teleporta ao perder foco (Enter / clica fora)
 sectionTitle(tpPage, "COORDENADAS MANUAIS", nil, tpOrder)
 local coordRow = Instance.new("Frame", tpPage)
-coordRow.Size = UDim2.new(1, -12, 0, 80)
+coordRow.Size = UDim2.new(1, -12, 0, 56)
 coordRow.BackgroundColor3 = C.panel
 coordRow.BorderSizePixel = 0
 coordRow.LayoutOrder = tpOrder + 1
 corner(coordRow, 6)
-local cl = label(coordRow, "X, Y, Z", 11, C.textDim)
-cl.Size = UDim2.new(1,-10,0,18); cl.Position = UDim2.new(0,10,0,6)
+
+local cl = label(coordRow, "X, Y, Z  —  confirme com Enter", 11, C.textDim)
+cl.Size = UDim2.new(1,-10,0,18); cl.Position = UDim2.new(0,10,0,4)
+
 local coordBox = Instance.new("TextBox", coordRow)
 coordBox.Size = UDim2.new(1, -20, 0, 28)
-coordBox.Position = UDim2.new(0, 10, 0, 26)
+coordBox.Position = UDim2.new(0, 10, 0, 24)
 coordBox.BackgroundColor3 = C.dark
 coordBox.TextColor3 = C.text
 coordBox.PlaceholderText = "0, 100, 0"
@@ -930,21 +852,18 @@ coordBox.Text = ""
 coordBox.Font = Enum.Font.Code
 coordBox.TextSize = 12
 coordBox.BorderSizePixel = 0
+coordBox.ClearTextOnFocus = false
 corner(coordBox, 4)
-local goBtn = Instance.new("TextButton", coordRow)
-goBtn.Size = UDim2.new(1, -20, 0, 22)
-goBtn.Position = UDim2.new(0, 10, 0, 56)
-goBtn.BackgroundColor3 = C.accentDim
-goBtn.Text = "TELEPORTAR"
-goBtn.TextColor3 = C.accent
-goBtn.Font = Enum.Font.GothamBold
-goBtn.TextSize = 11
-goBtn.BorderSizePixel = 0
-corner(goBtn, 4)
-goBtn.MouseButton1Click:Connect(function()
+
+-- teleporta ao soltar o foco (Enter ou clicar fora)
+coordBox.FocusLost:Connect(function()
     local parts = {}
-    for n in coordBox.Text:gmatch("[%-]?%d+%.?%d*") do table.insert(parts, tonumber(n)) end
-    if #parts >= 3 then teleport(Vector3.new(parts[1], parts[2], parts[3])) end
+    for n in coordBox.Text:gmatch("[%-]?%d+%.?%d*") do
+        table.insert(parts, tonumber(n))
+    end
+    if #parts >= 3 then
+        teleport(Vector3.new(parts[1], parts[2], parts[3]))
+    end
 end)
 
 -- ═══════════════════════════════════════════════════════════════
@@ -953,6 +872,7 @@ end)
 local stPage = tabPages["STATS"]
 sectionTitle(stPage, "AUTO STATS", nil, 1)
 toggleRow(stPage, "Auto Stats", "Aloca pontos na stat selecionada", function(v) State.autoStats = v end, 2)
+
 local statRow = Instance.new("Frame", stPage)
 statRow.Size = UDim2.new(1, -12, 0, 70)
 statRow.BackgroundColor3 = C.panel
@@ -996,6 +916,7 @@ end, 2)
 toggleRow(msPage, "Speed Hack", "Aumenta velocidade", function(v)
     State.speed = v; applySpeed()
 end, 3)
+
 local speedInputRow = Instance.new("Frame", msPage)
 speedInputRow.Size = UDim2.new(1, -12, 0, 50)
 speedInputRow.BackgroundColor3 = C.panel
@@ -1019,6 +940,7 @@ speedBox:GetPropertyChangedSignal("Text"):Connect(function()
     local n = tonumber(speedBox.Text)
     if n then State.speedValue = n; applySpeed() end
 end)
+
 sectionTitle(msPage, "UTILIDADES", nil, 5)
 toggleRow(msPage, "Anti AFK", "Previne kick por inatividade", function(v) State.antiAfk = v end, 6)
 toggleRow(msPage, "No Cooldown", "Remove cooldown de habilidades", function(v)
@@ -1040,11 +962,10 @@ simpleBtn(msPage, "COPIAR POSICAO", function()
 end, 9)
 
 -- ─────────────────────────────────────────────────────────────
--- SECAO WEBHOOK — envia join link para Discord
+-- WEBHOOK DISCORD
 -- ─────────────────────────────────────────────────────────────
 sectionTitle(msPage, "WEBHOOK DISCORD", nil, 10)
 
--- campo URL do webhook
 local whFrame = Instance.new("Frame", msPage)
 whFrame.Size = UDim2.new(1, -12, 0, 54)
 whFrame.BackgroundColor3 = C.panel
@@ -1069,68 +990,24 @@ whBox.BorderSizePixel = 0
 whBox.ClearTextOnFocus = false
 corner(whBox, 4)
 
--- campo mensagem customizada (opcional)
-local whMsgFrame = Instance.new("Frame", msPage)
-whMsgFrame.Size = UDim2.new(1, -12, 0, 54)
-whMsgFrame.BackgroundColor3 = C.panel
-whMsgFrame.BorderSizePixel = 0
-whMsgFrame.LayoutOrder = 12
-corner(whMsgFrame, 6)
-
-local whMsgLbl = label(whMsgFrame, "Mensagem (opcional)", 11, C.textDim)
-whMsgLbl.Size = UDim2.new(1, -10, 0, 16)
-whMsgLbl.Position = UDim2.new(0, 10, 0, 4)
-
-local whMsgBox = Instance.new("TextBox", whMsgFrame)
-whMsgBox.Size = UDim2.new(1, -20, 0, 24)
-whMsgBox.Position = UDim2.new(0, 10, 0, 24)
-whMsgBox.BackgroundColor3 = C.dark
-whMsgBox.TextColor3 = C.text
-whMsgBox.PlaceholderText = "ex: Depth King - 11/12"
-whMsgBox.Text = ""
-whMsgBox.Font = Enum.Font.Code
-whMsgBox.TextSize = 10
-whMsgBox.BorderSizePixel = 0
-whMsgBox.ClearTextOnFocus = false
-corner(whMsgBox, 4)
-
--- botao enviar
-local whBtn = Instance.new("TextButton", msPage)
-whBtn.Size = UDim2.new(1, -12, 0, 30)
-whBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242) -- Discord azul
-whBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-whBtn.Font = Enum.Font.GothamBold
-whBtn.TextSize = 12
-whBtn.Text = "ENVIAR JOIN LINK"
-whBtn.BorderSizePixel = 0
-whBtn.LayoutOrder = 13
-corner(whBtn, 6)
-
--- gera link de join do servidor atual
 local function getJoinLink()
-    local placeId  = game.PlaceId
-    local jobId    = game.JobId
-    -- link direto para este servidor via roblox://
-    return string.format("roblox://experiences/start?placeId=%s&gameInstanceId=%s", placeId, jobId)
+    return string.format(
+        "roblox://experiences/start?placeId=%s&gameInstanceId=%s",
+        game.PlaceId, game.JobId
+    )
 end
 
--- envia via request HTTP (syn/http_request dependendo do executor)
-local function sendWebhook(url, msg)
-    if url == "" or not url:find("discord.com/api/webhooks") then
-        notify("URL invalida!", Color3.fromRGB(220,60,60))
-        return
-    end
+local function sendWebhook(url)
+    if url == "" or not url:find("discord.com/api/webhooks") then return end
     local lv       = getLevel()
     local joinLink = getJoinLink()
     local username = lp.Name
     local content  = string.format(
-        "**%s** | Level **%d**\n%s\n> Join: %s",
-        username, lv,
-        msg ~= "" and ("```" .. msg .. "```") or "",
-        joinLink
+        "**%s** | Level **%d**\n> Join: %s",
+        username, lv, joinLink
     )
     local body = game:GetService("HttpService"):JSONEncode({
-        username   = "NTT HUB",
+        username = "NTT HUB",
         avatar_url = "https://i.imgur.com/4M34hi2.png",
         embeds = {{
             title       = "King Legacy — Join Link",
@@ -1139,7 +1016,7 @@ local function sendWebhook(url, msg)
             footer      = { text = "NTT HUB • " .. os.date("%H:%M:%S") }
         }}
     })
-    local ok, err = pcall(function()
+    pcall(function()
         local req = (syn and syn.request) or (http and http.request) or request
         req({
             Url     = url,
@@ -1148,35 +1025,38 @@ local function sendWebhook(url, msg)
             Body    = body
         })
     end)
-    if ok then
-        notify("Webhook enviado!", Color3.fromRGB(50,200,100))
-    else
-        notify("Erro: " .. tostring(err):sub(1,40), Color3.fromRGB(220,60,60))
-    end
 end
 
+local whBtn = Instance.new("TextButton", msPage)
+whBtn.Size = UDim2.new(1, -12, 0, 30)
+whBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+whBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+whBtn.Font = Enum.Font.GothamBold
+whBtn.TextSize = 12
+whBtn.Text = "ENVIAR JOIN LINK"
+whBtn.BorderSizePixel = 0
+whBtn.LayoutOrder = 12
+corner(whBtn, 6)
 whBtn.MouseButton1Click:Connect(function()
-    sendWebhook(whBox.Text, whMsgBox.Text)
+    sendWebhook(whBox.Text)
 end)
 
--- auto-send toggle (envia a cada X minutos)
 local whAutoRunning = false
-local whTask = nil
 toggleRow(msPage, "Auto Webhook", "Envia join link automaticamente (5 min)", function(v)
     whAutoRunning = v
     if v then
-        whTask = task.spawn(function()
+        task.spawn(function()
             while whAutoRunning do
-                sendWebhook(whBox.Text, whMsgBox.Text)
-                task.wait(300) -- 5 minutos
+                sendWebhook(whBox.Text)
+                task.wait(300)
             end
         end)
-    else
-        whAutoRunning = false
     end
-end, 14)
+end, 13)
 
--- ── Tabs sidebar ──────────────────────────────────────────────────────────────
+-- ═══════════════════════════════════════════════════════════════
+-- SIDEBAR TABS
+-- ═══════════════════════════════════════════════════════════════
 local tabY = 10
 for _, name in pairs(tabNames) do
     local btn = Instance.new("TextButton", sidebar)
@@ -1209,7 +1089,6 @@ tabBtns["AUTO FARM"].TextColor3 = Color3.fromRGB(255,255,255)
 tabPages["AUTO FARM"].Visible = true
 activeTab = "AUTO FARM"
 
--- Rodape
 local footer = Instance.new("TextLabel", mainFrame)
 footer.Size = UDim2.new(1, 0, 0, 16)
 footer.Position = UDim2.new(0, 0, 1, -16)
@@ -1220,7 +1099,7 @@ footer.Font = Enum.Font.Gotham
 footer.TextSize = 9
 footer.TextXAlignment = Enum.TextXAlignment.Center
 
--- Notificacao
+-- notificacao
 local function notify(msg, color)
     local notif = Instance.new("Frame", sg)
     notif.Size = UDim2.new(0, 280, 0, 40)
@@ -1246,16 +1125,13 @@ local function notify(msg, color)
     end)
 end
 
-notify("NTT HUB carregado!", Color3.fromRGB(50, 200, 100))
+notify("NTT HUB v2.2 carregado!", Color3.fromRGB(50, 200, 100))
 
 lp.CharacterAdded:Connect(function(char)
     lc = char
     task.wait(1)
-    if State.speed then applySpeed() end
-    if State.fly   then enableFly()  end
-    if State.autoFarm then
-        farmRunning = false
-        farmLoop()
-    end
+    if State.speed    then applySpeed() end
+    if State.fly      then enableFly()  end
+    if State.autoFarm then farmRunning = false; farmLoop() end
     notify("Personagem respawnado")
 end)
